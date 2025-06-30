@@ -4,3 +4,4 @@ numpy
 shap
 joblib
 lightgbm
+matplotlib
