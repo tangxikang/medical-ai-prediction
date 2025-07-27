@@ -5,14 +5,16 @@ import joblib
 import tempfile
 import os
 import streamlit.components.v1 as components
+import re
 
+# ───────────── 0. Page config ─────────────
 st.set_page_config(
     page_title="Medical AI Prediction System",
     layout="wide",
     page_icon="🏥",
 )
 
-# ─────────────────── 1. Custom CSS ───────────────────
+# ───────────── 1. Custom CSS ─────────────
 st.markdown(
     """
     <style>
@@ -36,7 +38,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# ─────────────────── 2. Load the model ───────────────
+# ───────────── 2. Load model ─────────────
 @st.cache_resource
 def load_model():
     """Load the pre‑trained LGBM‑dart model from disk."""
@@ -45,35 +47,16 @@ def load_model():
 model = load_model()
 explainer = shap.TreeExplainer(model)
 
-# ─────────────────── 3. Feature meta data ────────────
+# ───────────── 3. Feature meta data ─────────────
 FEATURE_NAMES = [
-    "SBP",
-    "DBP",
-    "APSIII",
-    "WBC",
-    "AG",
-    "HCO3",
-    "Na",
-    "BUN",
-    "Temp",
-    "RDW",
-    "PLT",
-    "Lactate",
+    "SBP", "DBP", "APSIII", "WBC", "AG", "HCO3",
+    "Na", "BUN", "Temp", "RDW", "PLT", "Lactate",
 ]
 
 DEFAULTS = {
-    "SBP": 120.0,
-    "DBP": 80.0,
-    "APSIII": 40.0,
-    "WBC": 7.0,
-    "AG": 12.0,
-    "HCO3": 24.0,
-    "Na": 140.0,
-    "BUN": 15.0,
-    "Temp": 37.0,
-    "RDW": 13.0,
-    "PLT": 200.0,
-    "Lactate": 1.0,
+    "SBP": 120.0, "DBP": 80.0, "APSIII": 40.0, "WBC": 7.0,
+    "AG": 12.0, "HCO3": 24.0, "Na": 140.0, "BUN": 15.0,
+    "Temp": 37.0, "RDW": 13.0, "PLT": 200.0, "Lactate": 1.0,
 }
 
 LABELS = {
@@ -85,59 +68,64 @@ LABELS = {
     "HCO3": "Bicarbonate (HCO₃⁻) – mmol/L",
     "Na": "Sodium (Na⁺) – mmol/L",
     "BUN": "Blood Urea Nitrogen (BUN) – mg/dL",
-    "Temp": "Body Temperature (Temp) – °C",        # ✅ 添加括号
+    "Temp": "Body Temperature (Temp) – °C",
     "RDW": "Red Cell Distribution Width (RDW) – fl",
     "PLT": "Platelet Count (PLT) – 10^3/µL",
-    "Lactate": "Lactate (Lac) – mmol/L",            # ✅ 添加括号
+    "Lactate": "Lactate (Lac) – mmol/L",
 }
 
+RANGE_LIMITS = {
+    "SBP": (0, 500),   "DBP": (0, 500),   "APSIII": (0, 500),
+    "WBC": (0, 5000),  "AG": (0, 100),    "HCO3": (0, 100),
+    "Na": (0, 300),    "BUN": (0, 300),   "Temp": (0, 45),
+    "RDW": (0, 100),   "PLT": (0, 5000),  "Lactate": (0, 100),
+}
 
-# ─────────────────── 4. Page header ──────────────────
+# 哪些特征只允许整数
+INT_FEATURES = {"SBP", "DBP", "APSIII", "PLT"}
+
+# ───────────── 4. Page header ─────────────
 st.title("🏥 Medical AI Decision Support System")
 st.markdown(
-    "Enter the 12 bedside test indicators below. The system will predict **in‑hospital mortality risk** and provide a **SHAP force plot** explanation.\n"
+    "Enter the 12 bedside test indicators below. "
+    "The system will predict **in‑hospital mortality risk** "
+    "and provide a **SHAP force plot** explanation.\n"
 )
 
-# ─────────────────── 5. Collect user input ───────────
-
+# ───────────── 5. Collect user input ─────────────
 def user_input_features() -> pd.DataFrame:
     st.markdown("### 👨‍⚕️ Enter the 12 clinical indicators")
     left, right = st.columns(2)
-    data: dict[str, int] = {}
-
-    RANGE_LIMITS = {
-        "SBP": (0, 500),
-        "DBP": (0, 500),
-        "APSIII": (0, 500),
-        "WBC": (0, 5000),
-        "AG": (0, 100),
-        "HCO3": (0, 100),
-        "Na": (0, 300),
-        "BUN": (0, 300),
-        "Temp": (0, 45),
-        "RDW": (0, 100),
-        "PLT": (0, 5000),
-        "Lactate": (0, 100),
-    }
+    data = {}
 
     for i, feat in enumerate(FEATURE_NAMES):
         col = left if i < 6 else right
         min_val, max_val = RANGE_LIMITS[feat]
-        data[feat] = col.number_input(
-            label=LABELS[feat],
-            min_value=min_val,
-            max_value=max_val,
-            value=int(DEFAULTS[feat]),
-            step=1,
-            format="%d"
-        )
+
+        if feat in INT_FEATURES:
+            data[feat] = col.number_input(
+                label=LABELS[feat],
+                min_value=int(min_val),
+                max_value=int(max_val),
+                value=int(DEFAULTS[feat]),
+                step=1,
+                format="%d",
+            )
+        else:
+            data[feat] = col.number_input(
+                label=LABELS[feat],
+                min_value=float(min_val),
+                max_value=float(max_val),
+                value=float(DEFAULTS[feat]),
+                step=0.1,
+                format="%.1f",
+            )
 
     return pd.DataFrame([data])
 
-
 input_df = user_input_features()
 
-# ─────────────────── 6. Prediction & SHAP plot ───────
+# ───────────── 6. Prediction & SHAP plot ─────────────
 if st.button("Start Prediction"):
     # 6‑1   Probability prediction
     proba = model.predict_proba(input_df)[0, 1] * 100  # to percent
@@ -155,18 +143,20 @@ if st.button("Start Prediction"):
 
     # 6‑2   Compute SHAP values
     shap_values = explainer.shap_values(input_df)
-    if isinstance(shap_values, list):
-        sv = shap_values[1][0]  # positive class for binary models
+    if isinstance(shap_values, list):      # binary model
+        sv = shap_values[1][0]
         base_val = explainer.expected_value[1]
-    else:
+    else:                                  # single output model
         sv = shap_values[0]
         base_val = explainer.expected_value
 
-    # 6‑3   Feature names shown in the force plot – must exactly match the input labels
-    import re
-    display_names = [re.search(r"\((.*?)\)", LABELS[f]).group(1) if "(" in LABELS[f] else LABELS[f] for f in FEATURE_NAMES]
-
-    feature_values = input_df.iloc[0].values  # ndarray aligned with sv
+    # 6‑3   Display names for force plot
+    display_names = [
+        re.search(r"\((.*?)\)", LABELS[f]).group(1)
+        if "(" in LABELS[f] else LABELS[f]
+        for f in FEATURE_NAMES
+    ]
+    feature_values = input_df.iloc[0].values
 
     force_html = shap.plots.force(
         base_value=base_val,
@@ -176,7 +166,7 @@ if st.button("Start Prediction"):
         matplotlib=False,
     ).html()
 
-    # 6‑4   Embed the plot inside Streamlit
+    # 6‑4   Embed the plot in Streamlit
     html_all = f"<head>{shap.getjs()}</head><body>{force_html}</body>"
     with tempfile.NamedTemporaryFile(delete=False, suffix=".html") as tmp:
         tmp.write(html_all.encode("utf-8"))
