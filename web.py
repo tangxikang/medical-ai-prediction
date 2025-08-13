@@ -11,13 +11,14 @@ import tempfile
 import streamlit as st
 import streamlit.components.v1 as components
 
+# ───────────────────────── App Config ─────────────────────────
 st.set_page_config(
     page_title="Medical AI Prediction System",
     layout="wide",
     page_icon="🏥",
 )
 
-# ────────────── Custom CSS ──────────────
+# ───────────────────────── Global Styles ──────────────────────
 st.markdown("""
 <style>
     .stButton>button {
@@ -38,7 +39,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ────────────── Load model & features ──────────────
+# ───────────────────────── Model & Features ───────────────────
 @st.cache_resource
 def load_model():
     return joblib.load("result/LGBM-dart_model.pkl")
@@ -51,7 +52,7 @@ model = load_model()
 feature_list = load_features()
 explainer = shap.TreeExplainer(model)
 
-# ────────────── 固定映射，不改动 ──────────────
+# ───────────────────────── Name Mapping (fixed) ───────────────
 COLUMN_MAPPING = {
     "SB": "SBP", "DB": "DBP", "T": "Temp",
     "score1": "APS III", "score2": "WBC", "score6": "PLT",
@@ -60,6 +61,7 @@ COLUMN_MAPPING = {
 }
 std_feature_list = [COLUMN_MAPPING.get(f, f) for f in feature_list]
 
+# ───────────────────────── Defaults & Labels ──────────────────
 DEFAULTS = {
     "SBP": 122.5, "DBP": 84.8, "APS III": 29, "WBC": 7.9,
     "PLT": 165.4, "AG": 9, "HCO₃⁻": 21, "RDW": 15.3,
@@ -81,12 +83,14 @@ LABELS = {
     "Creatinine": "Creatinine (Cre) – mg/dL"
 }
 
+# ───────────────────────── UI Header ──────────────────────────
 st.title("🏥 Medical AI Decision Support System")
 st.markdown(
     "Enter the 12 bedside test indicators below. The system will predict **in-hospital mortality risk** "
     "and provide a **SHAP force plot** explanation.\n"
 )
 
+# ───────────────────────── Helpers ────────────────────────────
 _num_pattern = re.compile(r"^[+-]?(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?$")
 
 def _to_float(text: str, default: float, name: str) -> float:
@@ -117,10 +121,11 @@ def user_input_features() -> pd.DataFrame:
     df = pd.DataFrame([data], columns=std_feature_list).astype(float)
     return df
 
+# ───────────────────────── Main Form ──────────────────────────
 input_df = user_input_features()
 
-# ────────────── Predict & Explain ──────────────
 if st.button("Start Prediction"):
+    # ——— Predict
     input_df = input_df[std_feature_list]
     proba = model.predict_proba(input_df)[0, 1] * 100.0
     proba_int = round(proba, 2)
@@ -137,10 +142,10 @@ if st.button("Start Prediction"):
     st.markdown("---")
     st.subheader("🔍 SHAP Force Plot Explanation")
 
-    # 1) shap values & base value (兼容二分类/多版本)
+    # ——— SHAP values & base value (version-safe)
     shap_values = explainer.shap_values(input_df)
-    if isinstance(shap_values, list):
-        sv_vec = np.array(shap_values[-1][0], dtype=float)    # 正类
+    if isinstance(shap_values, list):  # binary classifier
+        sv_vec = np.array(shap_values[-1][0], dtype=float)
         base_val = float(np.ravel(explainer.expected_value)[-1])
     else:
         sv_vec = np.array(shap_values[0], dtype=float)
@@ -149,25 +154,33 @@ if st.button("Start Prediction"):
     short_names    = std_feature_list
     feature_values = input_df.iloc[0].values.astype(float)
 
-    # 2) 生成 force plot（新 API 优先，失败回退老 API）
+    # ——— Try new API, fallback to old API
     try:
-        force_obj = shap.plots.force(base_val, sv_vec, feature_values,
-                                     feature_names=short_names, matplotlib=False)
+        force_obj  = shap.plots.force(base_val, sv_vec, feature_values,
+                                      feature_names=short_names, matplotlib=False)
         force_html = force_obj.html()
     except TypeError:
-        force_obj = shap.force_plot(base_val, sv_vec, feature_values,
-                                    feature_names=short_names, matplotlib=False)
+        force_obj  = shap.force_plot(base_val, sv_vec, feature_values,
+                                     feature_names=short_names, matplotlib=False)
         force_html = force_obj.html()
 
-    # 3) 居中 + 自适应容器（含 JS 修正根节点宽度）
+    # ——— Stable-width centered container (fix tiny/squeezed chart)
     html_all = f"""
     <head>
       {shap.getjs()}
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
       <style>
         html, body {{ margin:0; padding:0; }}
-        .outer {{ width:100%; display:flex; justify-content:center; }}
-        .inner {{ width:fit-content; max-width:100%; overflow-x:auto; }}
-        .inner > div:first-child {{ display:inline-block !important; }}
+        .outer {{
+          width: 100%;
+          display: flex;
+          justify-content: center;            /* center horizontally */
+        }}
+        .inner {{
+          width: min(1200px, max(720px, 60vw)); /* ★ stable width for SHAP JS */
+          overflow-x: auto;                     /* allow scroll on very small screens */
+        }}
+        .inner > div:first-child {{ display: inline-block !important; }}
       </style>
     </head>
     <body>
@@ -177,14 +190,15 @@ if st.button("Start Prediction"):
         </div>
       </div>
       <script>
-        (function(){{
-          var h = document.getElementById('shap-holder');
-          if(!h) return;
-          var c = h.firstElementChild;
-          if(!c) return;
-          c.style.display = 'inline-block';
-          c.style.width = 'auto';
-          c.style.maxWidth = '100%';
+        (function() {{
+          // ensure SHAP root doesn't force 100% width
+          var holder = document.getElementById('shap-holder');
+          if (!holder) return;
+          var child = holder.firstElementChild;
+          if (!child) return;
+          child.style.display = 'inline-block';
+          child.style.width   = 'auto';
+          child.style.maxWidth = '100%';
         }})();
       </script>
     </body>
@@ -195,6 +209,6 @@ if st.button("Start Prediction"):
         tmp_path = tmp.name
 
     with open(tmp_path, "r", encoding="utf-8") as f:
-        components.html(f.read(), height=420, scrolling=True)
+        components.html(f.read(), height=520, scrolling=True)
 
     os.remove(tmp_path)
