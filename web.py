@@ -22,7 +22,7 @@ st.set_page_config(
 st.markdown("""
 <style>
     html, body, [class*="css"]  {
-        font-size: 1rem; /* 全局基础字体，原本是16px，这里+4px */
+        font-size: 0.5rem; /* 全局基础字体，原本是16px，这里+4px */
     }
     .stButton>button {
         background-color: #ff4b4b;
@@ -189,4 +189,5 @@ if st.button("Start Prediction"):
     st.markdown("</div>", unsafe_allow_html=True)
 
     plt.close()
+
 
