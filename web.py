@@ -152,7 +152,7 @@ if st.button("Start Prediction"):
     short_names = std_feature_list
     feature_values = input_df.iloc[0].values
 
-    # 生成 force plot HTML（只显示简称，f(x)还是logit，不做hack）
+    # 生成 force plot HTML
     force_html = shap.plots.force(
         base_value=base_val,
         shap_values=sv,
@@ -161,7 +161,16 @@ if st.button("Start Prediction"):
         matplotlib=False,
     ).html()
 
-    html_all = f"<head>{shap.getjs()}</head><body>{force_html}</body>"
+    # 包装成居中容器
+    html_all = f"""
+    <head>{shap.getjs()}</head>
+    <body style="margin:0; display:flex; justify-content:center;">
+        <div style="max-width:100%; overflow-x:auto;">
+            {force_html}
+        </div>
+    </body>
+    """
+
     with tempfile.NamedTemporaryFile(delete=False, suffix=".html") as tmp:
         tmp.write(html_all.encode("utf-8"))
         tmp_path = tmp.name
@@ -169,3 +178,4 @@ if st.button("Start Prediction"):
     with open(tmp_path, "r", encoding="utf-8") as f:
         components.html(f.read(), height=420)
     os.remove(tmp_path)
+
