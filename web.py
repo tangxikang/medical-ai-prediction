@@ -160,22 +160,23 @@ if st.button("Start Prediction"):
         feature_names=short_names,
         matplotlib=False,
     ).html()
-
-    # 包装成居中容器
+    
+    # 外层用 flex 居中 + 内层自适应宽度
     html_all = f"""
     <head>{shap.getjs()}</head>
-    <body style="margin:0; display:flex; justify-content:center;">
-        <div style="max-width:100%; overflow-x:auto;">
+    <body style="margin:0; display:flex; justify-content:center; align-items:center; width:100%;">
+        <div style="display:inline-block; max-width:100%; overflow-x:auto;">
             {force_html}
         </div>
     </body>
     """
-
+    
     with tempfile.NamedTemporaryFile(delete=False, suffix=".html") as tmp:
         tmp.write(html_all.encode("utf-8"))
         tmp_path = tmp.name
-
+    
     with open(tmp_path, "r", encoding="utf-8") as f:
         components.html(f.read(), height=420)
     os.remove(tmp_path)
+
 
