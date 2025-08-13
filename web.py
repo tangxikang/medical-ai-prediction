@@ -21,19 +21,22 @@ st.set_page_config(
 # ───────────────────────── Global Styles ──────────────────────
 st.markdown("""
 <style>
+    html, body, [class*="css"]  {
+        font-size: 20px; /* 全局基础字体，原本是16px，这里+4px */
+    }
     .stButton>button {
         background-color: #ff4b4b;
         color: white;
         border-radius: 10px;
-        font-size: 20px;
+        font-size: 24px; /* 按钮字体加大 */
         padding: 0.5em 1em;
     }
     .stTextInput>div>div>input {
-        font-size: 18px;
+        font-size: 22px; /* 输入框内容字体加大 */
         border-radius: 8px;
     }
     label[data-baseweb="form-control"] > div:first-child {
-        font-size: 20px;
+        font-size: 24px; /* 输入框标签加大 */
         font-weight: 600;
     }
 </style>
@@ -166,3 +169,4 @@ if st.button("Start Prediction"):
     )
     st.pyplot(plt.gcf(), use_container_width=True)
     plt.close()
+
