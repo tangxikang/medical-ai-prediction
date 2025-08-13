@@ -170,10 +170,11 @@ if st.button("Start Prediction"):
         """,
         unsafe_allow_html=True
     )
-    st.pyplot(plt.gcf(), use_container_width=False)
+    st.pyplot(plt.gcf(), use_container_width=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
     plt.close()
+
 
 
 
