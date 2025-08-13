@@ -158,6 +158,16 @@ if st.button("Start Prediction"):
     short_names    = std_feature_list
 
     # ——— 静态 force_plot（不依赖任何 JS/CDN）
+    import matplotlib as mpl
+    mpl.rcParams.update({
+        'font.size': 10,           # 缩小字体
+        'axes.titlesize': 10,
+        'axes.labelsize': 10,
+        'xtick.labelsize': 9,
+        'ytick.labelsize': 9,
+        'legend.fontsize': 9
+    })
+
     plt.figure(figsize=(3, 1.8))
     shap.force_plot(
         base_val,
@@ -169,6 +179,7 @@ if st.button("Start Prediction"):
     )
     st.pyplot(plt.gcf(), use_container_width=True)
     plt.close()
+
 
 
 
