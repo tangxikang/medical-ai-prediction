@@ -177,8 +177,9 @@ if st.button("Start Prediction"):
         matplotlib=True,
         show=False
     )
-    st.pyplot(plt.gcf(), use_container_width=True)
+    st.pyplot(plt.gcf(), use_container_width=False)
     plt.close()
+
 
 
 
