@@ -160,12 +160,12 @@ if st.button("Start Prediction"):
     # ——— 静态 force_plot（不依赖任何 JS/CDN）
     import matplotlib as mpl
     mpl.rcParams.update({
-        'font.size': 20,           # 缩小字体
-        'axes.titlesize': 10,
-        'axes.labelsize': 10,
-        'xtick.labelsize': 9,
-        'ytick.labelsize': 9,
-        'legend.fontsize': 9
+        'font.size': 50,           # 缩小字体
+        'axes.titlesize': 50,
+        'axes.labelsize': 50,
+        'xtick.labelsize': 39,
+        'ytick.labelsize': 39,
+        'legend.fontsize': 39
     })
 
     plt.figure(figsize=(5, 2))  # 缩小画布，5x2 英寸
@@ -180,6 +180,7 @@ if st.button("Start Prediction"):
     plt.tight_layout()  # 让内容紧凑
     st.pyplot(plt.gcf(), use_container_width=False)  # 不拉伸，保持缩小
     plt.close()
+
 
 
 
