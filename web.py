@@ -73,7 +73,7 @@ DEFAULTS = {
 LABELS = {
     "SBP": "Systolic Blood Pressure (SBP) – mmHg",
     "DBP": "Diastolic Blood Pressure (DBP) – mmHg",
-    "APSIII": "Acute Physiology Score III (APSIII)",
+    "APS III": "Acute Physiology Score III (APSIII)",
     "WBC": "White Blood Cell Count (WBC) – 10³/µL",
     "AG": "Anion Gap (AG) – mmol/L",
     "HCO₃⁻": "Bicarbonate (HCO₃⁻) – mmol/L",
@@ -211,5 +211,6 @@ with tempfile.NamedTemporaryFile(delete=False, suffix=".html") as tmp:
 with open(tmp_path, "r", encoding="utf-8") as f:
     components.html(f.read(), height=420, scrolling=True)  # 建议开启 scrolling
 os.remove(tmp_path)
+
 
 
