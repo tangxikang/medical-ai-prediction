@@ -152,31 +152,64 @@ if st.button("Start Prediction"):
     short_names = std_feature_list
     feature_values = input_df.iloc[0].values
 
-    # 生成 force plot HTML
-    force_html = shap.plots.force(
-        base_value=base_val,
-        shap_values=sv,
-        features=feature_values,
-        feature_names=short_names,
-        matplotlib=False,
-    ).html()
-    
-    # 外层用 flex 居中 + 内层自适应宽度
-    html_all = f"""
-    <head>{shap.getjs()}</head>
-    <body style="margin:0; display:flex; justify-content:center; align-items:center; width:100%;">
-        <div style="display:inline-block; max-width:100%; overflow-x:auto;">
-            {force_html}
-        </div>
-    </body>
-    """
-    
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".html") as tmp:
-        tmp.write(html_all.encode("utf-8"))
-        tmp_path = tmp.name
-    
-    with open(tmp_path, "r", encoding="utf-8") as f:
-        components.html(f.read(), height=420)
-    os.remove(tmp_path)
+# 生成 force plot HTML（shap 返回的是一段完整的 <div>+JS）
+force_html = shap.plots.force(
+    base_value=base_val,
+    shap_values=sv,
+    features=feature_values,
+    feature_names=short_names,
+    matplotlib=False,
+).html()
+
+# 外层居中 + 内层 fit-content，并用 JS 修正 SHAP 根节点宽度
+html_all = f"""
+<head>
+  {shap.getjs()}
+  <style>
+    html, body {{ margin:0; padding:0; }}
+    .outer {{
+      width: 100%;
+      display: flex;
+      justify-content: center;   /* 水平居中 */
+    }}
+    .inner {{
+      width: fit-content;         /* 根据内容宽度自适应 */
+      max-width: 100%;            /* 不超过屏幕 */
+      overflow-x: auto;           /* 小屏可横向滚动 */
+    }}
+    /* 兜底：尽量让第一个子元素是 inline-block，便于被居中 */
+    .inner > div:first-child {{ display: inline-block !important; }}
+  </style>
+</head>
+<body>
+  <div class="outer">
+    <div class="inner" id="shap-holder">
+      {force_html}
+    </div>
+  </div>
+
+  <script>
+    // 有些版本的 SHAP 会把根节点设为 width:100%；
+    // 调整为 inline-block/auto，避免占满整行导致“看起来在左侧”
+    (function() {{
+      var holder = document.getElementById('shap-holder');
+      if (!holder) return;
+      var child = holder.firstElementChild;
+      if (!child) return;
+      child.style.display = 'inline-block';
+      child.style.width = 'auto';
+      child.style.maxWidth = '100%';
+    }})();
+  </script>
+</body>
+"""
+
+with tempfile.NamedTemporaryFile(delete=False, suffix=".html") as tmp:
+    tmp.write(html_all.encode("utf-8"))
+    tmp_path = tmp.name
+
+with open(tmp_path, "r", encoding="utf-8") as f:
+    components.html(f.read(), height=420, scrolling=True)  # 建议开启 scrolling
+os.remove(tmp_path)
 
 
