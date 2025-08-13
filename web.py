@@ -168,7 +168,7 @@ if st.button("Start Prediction"):
         'legend.fontsize': 9
     })
 
-    plt.figure(figsize=(3, 1.8))
+    plt.figure(figsize=(3, 2))
     shap.force_plot(
         base_val,
         sv_vec,
@@ -179,6 +179,7 @@ if st.button("Start Prediction"):
     )
     st.pyplot(plt.gcf(), use_container_width=True)
     plt.close()
+
 
 
 
