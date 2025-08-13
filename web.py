@@ -4,135 +4,134 @@ import shap
 import joblib
 import tempfile
 import os
-import streamlit.components.v1 as components
 import re
+import streamlit.components.v1 as components
 
-# ───────────── 0. Page config ─────────────
 st.set_page_config(
     page_title="Medical AI Prediction System",
     layout="wide",
     page_icon="🏥",
 )
 
-# ───────────── 1. Custom CSS ─────────────
-st.markdown(
-    """
-    <style>
-        .stButton>button {
-            background-color: #ff4b4b;
-            color: white;
-            border-radius: 10px;
-            font-size: 20px;
-            padding: 0.5em 1em;
-        }
-        .stNumberInput>div>input {
-            font-size: 18px;
-            border-radius: 8px;
-        }
-        label[data-baseweb="form-control"] > div:first-child {
-            font-size: 20px;
-            font-weight: 600;
-        }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
+# Custom CSS
+st.markdown("""
+<style>
+    .stButton>button {
+        background-color: #ff4b4b;
+        color: white;
+        border-radius: 10px;
+        font-size: 20px;
+        padding: 0.5em 1em;
+    }
+    .stTextInput>div>div>input {
+        font-size: 18px;
+        border-radius: 8px;
+    }
+    label[data-baseweb="form-control"] > div:first-child {
+        font-size: 20px;
+        font-weight: 600;
+    }
+</style>
+""", unsafe_allow_html=True)
 
-# ───────────── 2. Load model ─────────────
 @st.cache_resource
 def load_model():
-    """Load the pre‑trained LGBM‑dart model from disk."""
     return joblib.load("result/LGBM-dart_model.pkl")
+@st.cache_resource
+def load_features():
+    return joblib.load("result/LGBM-dart_features.pkl")
 
 model = load_model()
+feature_list = load_features()
 explainer = shap.TreeExplainer(model)
 
-# ───────────── 3. Feature meta data ─────────────
-FEATURE_NAMES = [
-    "SBP", "DBP", "APSIII", "WBC", "AG", "HCO3",
-    "Na", "BUN", "Temp", "RDW", "PLT", "Lactate",
-]
-
-DEFAULTS = {
-    "SBP": 120.0, "DBP": 80.0, "APSIII": 40.0, "WBC": 7.0,
-    "AG": 12.0, "HCO3": 24.0, "Na": 140.0, "BUN": 15.0,
-    "Temp": 37.0, "RDW": 13.0, "PLT": 200.0, "Lactate": 1.0,
+# 不修改此映射
+COLUMN_MAPPING = {
+    "SB": "SBP", "DB": "DBP", "T": "Temp",
+    "score1": "APS III", "score2": "WBC", "score6": "PLT",
+    "score7": "AG", "score8": "HCO₃⁻", "SC1": "RDW",
+    "Na": "Na⁺", "BUN": "BUN", "Cre": "Creatinine", "Lac": "Lac"
 }
 
+std_feature_list = [COLUMN_MAPPING.get(f, f) for f in feature_list]
+
+DEFAULTS = {
+    "SBP": 122.5,
+    "DBP": 84.8,
+    "APS III": 29,
+    "WBC": 7.9,
+    "PLT": 165.4,
+    "AG": 9,
+    "HCO₃⁻": 21,
+    "RDW": 15.3,
+    "Na⁺": 137.3,
+    "BUN": 14.7,
+    "Temp": 37,
+    "Lac": 0.9,
+    "Creatinine": 0.9
+}
 LABELS = {
     "SBP": "Systolic Blood Pressure (SBP) – mmHg",
     "DBP": "Diastolic Blood Pressure (DBP) – mmHg",
     "APSIII": "Acute Physiology Score III (APSIII)",
-    "WBC": "White Blood Cell Count (WBC) – 10^3/µL",
+    "WBC": "White Blood Cell Count (WBC) – 10³/µL",
     "AG": "Anion Gap (AG) – mmol/L",
-    "HCO3": "Bicarbonate (HCO₃⁻) – mmol/L",
-    "Na": "Sodium (Na⁺) – mmol/L",
+    "HCO₃⁻": "Bicarbonate (HCO₃⁻) – mmol/L",
+    "Na⁺": "Sodium (Na⁺) – mmol/L",
     "BUN": "Blood Urea Nitrogen (BUN) – mg/dL",
     "Temp": "Body Temperature (Temp) – °C",
     "RDW": "Red Cell Distribution Width (RDW) – fl",
-    "PLT": "Platelet Count (PLT) – 10^3/µL",
-    "Lactate": "Lactate (Lac) – mmol/L",
+    "PLT": "Platelet Count (PLT) – 10³/µL",
+    "Lac": "Lactate (Lac) – mmol/L",
+    "Creatinine": "Creatinine (Cre) – mg/dL"
 }
 
-RANGE_LIMITS = {
-    "SBP": (0, 500),   "DBP": (0, 500),   "APSIII": (0, 500),
-    "WBC": (0, 5000),  "AG": (0, 100),    "HCO3": (0, 100),
-    "Na": (0, 300),    "BUN": (0, 300),   "Temp": (0, 45),
-    "RDW": (0, 100),   "PLT": (0, 5000),  "Lactate": (0, 100),
-}
-
-# 哪些特征只允许整数
-INT_FEATURES = {"SBP", "DBP", "APSIII", "PLT"}
-
-# ───────────── 4. Page header ─────────────
 st.title("🏥 Medical AI Decision Support System")
 st.markdown(
-    "Enter the 12 bedside test indicators below. "
-    "The system will predict **in‑hospital mortality risk** "
-    "and provide a **SHAP force plot** explanation.\n"
+    "Enter the 12 bedside test indicators below. The system will predict **in-hospital mortality risk** and provide a **SHAP force plot** explanation.\n"
 )
 
-# ───────────── 5. Collect user input ─────────────
+_num_pattern = re.compile(r"^[+-]?(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?$")
+
+def _to_float(text: str, default: float, name: str) -> float:
+    t = text.strip()
+    if _num_pattern.match(t):
+        try:
+            return float(t)
+        except Exception:
+            st.warning(f"⚠️ {name}: cannot parse '{t}', fallback to default {default}.")
+            return float(default)
+    else:
+        st.warning(f"⚠️ {name}: invalid number '{t}', fallback to default {default}.")
+        return float(default)
+
 def user_input_features() -> pd.DataFrame:
     st.markdown("### 👨‍⚕️ Enter the 12 clinical indicators")
     left, right = st.columns(2)
     data = {}
-
-    for i, feat in enumerate(FEATURE_NAMES):
+    for i, feat in enumerate(std_feature_list):
         col = left if i < 6 else right
-        min_val, max_val = RANGE_LIMITS[feat]
-
-        if feat in INT_FEATURES:
-            data[feat] = col.number_input(
-                label=LABELS[feat],
-                min_value=int(min_val),
-                max_value=int(max_val),
-                value=int(DEFAULTS[feat]),
-                step=1,
-                format="%d",
-            )
-        else:
-            data[feat] = col.number_input(
-                label=LABELS[feat],
-                min_value=float(min_val),
-                max_value=float(max_val),
-                value=float(DEFAULTS[feat]),
-                step=0.1,
-                format="%.1f",
-            )
-
-    return pd.DataFrame([data])
+        val_str = col.text_input(
+            label=LABELS.get(feat, feat),
+            value=str(DEFAULTS.get(feat, 0)),
+            placeholder="Enter any real number (no limits)",
+            help="No min/max or decimal-place limits. Scientific notation supported (e.g., 1e-3)."
+        )
+        data[feat] = _to_float(val_str, DEFAULTS.get(feat, 0), feat)
+    df = pd.DataFrame([data], columns=std_feature_list).astype(float)
+    return df
 
 input_df = user_input_features()
 
-# ───────────── 6. Prediction & SHAP plot ─────────────
 if st.button("Start Prediction"):
-    # 6‑1   Probability prediction
-    proba = model.predict_proba(input_df)[0, 1] * 100  # to percent
+    input_df = input_df[std_feature_list]
+    proba = model.predict_proba(input_df)[0, 1] * 100.0
+    proba_int = round(proba, 2)
+
     st.markdown(
         f"""
-        <div style='text-align:center; font-size:22px; color:red; margin:20px 0;'>
-            <strong>🤖 Predicted in‑hospital mortality probability: {proba:.2f}%</strong>
+        <div style='text-align:center; font-size:28px; color:#c62828; margin:20px 0; font-weight:800;'>
+            🤖 Predicted in-hospital mortality probability: <span style='font-size:40px;'>{proba_int}%</span>
         </div>
         """,
         unsafe_allow_html=True,
@@ -141,37 +140,32 @@ if st.button("Start Prediction"):
     st.markdown("---")
     st.subheader("🔍 SHAP Force Plot Explanation")
 
-    # 6‑2   Compute SHAP values
     shap_values = explainer.shap_values(input_df)
-    if isinstance(shap_values, list):      # binary model
+    if isinstance(shap_values, list):
         sv = shap_values[1][0]
         base_val = explainer.expected_value[1]
-    else:                                  # single output model
+    else:
         sv = shap_values[0]
         base_val = explainer.expected_value
 
-    # 6‑3   Display names for force plot
-    display_names = [
-        re.search(r"\((.*?)\)", LABELS[f]).group(1)
-        if "(" in LABELS[f] else LABELS[f]
-        for f in FEATURE_NAMES
-    ]
+    # 只显示简称
+    short_names = std_feature_list
     feature_values = input_df.iloc[0].values
 
+    # 生成 force plot HTML（只显示简称，f(x)还是logit，不做hack）
     force_html = shap.plots.force(
         base_value=base_val,
         shap_values=sv,
         features=feature_values,
-        feature_names=display_names,
+        feature_names=short_names,
         matplotlib=False,
     ).html()
 
-    # 6‑4   Embed the plot in Streamlit
     html_all = f"<head>{shap.getjs()}</head><body>{force_html}</body>"
     with tempfile.NamedTemporaryFile(delete=False, suffix=".html") as tmp:
         tmp.write(html_all.encode("utf-8"))
         tmp_path = tmp.name
 
     with open(tmp_path, "r", encoding="utf-8") as f:
-        components.html(f.read(), height=380)
+        components.html(f.read(), height=420)
     os.remove(tmp_path)
