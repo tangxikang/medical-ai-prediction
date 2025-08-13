@@ -158,17 +158,7 @@ if st.button("Start Prediction"):
     short_names    = std_feature_list
 
     # ——— 静态 force_plot（不依赖任何 JS/CDN）
-    import matplotlib as mpl
-    mpl.rcParams.update({
-        'font.size': 50,           # 缩小字体
-        'axes.titlesize': 50,
-        'axes.labelsize': 50,
-        'xtick.labelsize': 39,
-        'ytick.labelsize': 39,
-        'legend.fontsize': 39
-    })
-
-    plt.figure(figsize=(5, 2))  # 缩小画布，5x2 英寸
+    plt.figure(figsize=(3, 1.8))
     shap.force_plot(
         base_val,
         sv_vec,
@@ -177,8 +167,7 @@ if st.button("Start Prediction"):
         matplotlib=True,
         show=False
     )
-    plt.tight_layout()  # 让内容紧凑
-    st.pyplot(plt.gcf(), use_container_width=False)  # 不拉伸，保持缩小
+    st.pyplot(plt.gcf(), use_container_width=True)
     plt.close()
 
 
