@@ -14,7 +14,6 @@ import streamlit as st
 # ───────────────────────── App Config ─────────────────────────
 st.set_page_config(
     page_title="Medical AI Prediction System",
-    layout="",
     page_icon="🏥",
 )
 
@@ -182,6 +181,7 @@ if st.button("Start Prediction"):
     st.markdown("</div>", unsafe_allow_html=True)
 
     plt.close()
+
 
 
 
