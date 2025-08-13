@@ -158,7 +158,7 @@ if st.button("Start Prediction"):
     short_names    = std_feature_list
 
     # ——— 静态 force_plot（不依赖任何 JS/CDN）
-    plt.figure(figsize=(7, 3.8))
+    plt.figure(figsize=(5, 3.8))
     shap.force_plot(
         base_val,
         sv_vec,
@@ -169,6 +169,7 @@ if st.button("Start Prediction"):
     )
     st.pyplot(plt.gcf(), use_container_width=True)
     plt.close()
+
 
 
 
