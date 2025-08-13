@@ -21,9 +21,17 @@ st.set_page_config(
 # ───────────────────────── Global Styles ──────────────────────
 st.markdown("""
 <style>
-    html, body, [class*="css"]  {
-        font-size: 0.8rem; /* 全局基础字体，原本是16px，这里+4px */
-    }
+/* 整个页面内容居中显示，最大宽度 800px */
+.main .block-container {
+    max-width: 800px;      /* 控制整体宽度 */
+    margin-left: auto;     /* 居中 */
+    margin-right: auto;    /* 居中 */
+}
+
+/* 全局字体缩放 */
+html, body, [class*="css"] {
+    font-size: 0.9rem; /* 你可以改成 0.8rem 或 1rem */
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -174,6 +182,7 @@ if st.button("Start Prediction"):
     st.markdown("</div>", unsafe_allow_html=True)
 
     plt.close()
+
 
 
 
