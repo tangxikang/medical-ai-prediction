@@ -7,9 +7,9 @@ import numpy as np
 import pandas as pd
 import shap
 import joblib
+import matplotlib.pyplot as plt
 import tempfile
 import streamlit as st
-import streamlit.components.v1 as components
 
 # ───────────────────────── App Config ─────────────────────────
 st.set_page_config(
@@ -87,7 +87,7 @@ LABELS = {
 st.title("🏥 Medical AI Decision Support System")
 st.markdown(
     "Enter the 12 bedside test indicators below. The system will predict **in-hospital mortality risk** "
-    "and provide a **SHAP force plot** explanation.\n"
+    "and provide a **SHAP force plot (static)** explanation.\n"
 )
 
 # ───────────────────────── Helpers ────────────────────────────
@@ -117,7 +117,7 @@ def user_input_features() -> pd.DataFrame:
             placeholder="Enter any real number (no limits)",
             help="No min/max or decimal-place limits. Scientific notation supported (e.g., 1e-3)."
         )
-        data[feat] = _to_float(val_str, DEFAULTS.get(feat, 0), feat)
+        data[feat] = _to_float(val_str, DEFAULTS.get(feet, 0) if (feet:=feat) else 0, feat)  # safe get
     df = pd.DataFrame([data], columns=std_feature_list).astype(float)
     return df
 
@@ -126,8 +126,8 @@ input_df = user_input_features()
 
 if st.button("Start Prediction"):
     # ——— Predict
-    input_df = input_df[std_feature_list]
-    proba = model.predict_proba(input_df)[0, 1] * 100.0
+    X = input_df[std_feature_list]
+    proba = model.predict_proba(X)[0, 1] * 100.0
     proba_int = round(proba, 2)
 
     st.markdown(
@@ -140,75 +140,29 @@ if st.button("Start Prediction"):
     )
 
     st.markdown("---")
-    st.subheader("🔍 SHAP Force Plot Explanation")
+    st.subheader("🔍 SHAP Force Plot (Static, Matplotlib)")
 
-    # ——— SHAP values & base value (version-safe)
-    shap_values = explainer.shap_values(input_df)
-    if isinstance(shap_values, list):  # binary classifier
+    # ——— SHAP values & base value（版本安全）
+    shap_values = explainer.shap_values(X)
+    if isinstance(shap_values, list):  # 二分类：取正类
         sv_vec = np.array(shap_values[-1][0], dtype=float)
         base_val = float(np.ravel(explainer.expected_value)[-1])
     else:
         sv_vec = np.array(shap_values[0], dtype=float)
         base_val = float(np.ravel(explainer.expected_value)[0])
 
+    feature_values = X.iloc[0].values.astype(float)
     short_names    = std_feature_list
-    feature_values = input_df.iloc[0].values.astype(float)
 
-    # ——— Try new API, fallback to old API
-    try:
-        force_obj  = shap.plots.force(base_val, sv_vec, feature_values,
-                                      feature_names=short_names, matplotlib=False)
-        force_html = force_obj.html()
-    except TypeError:
-        force_obj  = shap.force_plot(base_val, sv_vec, feature_values,
-                                     feature_names=short_names, matplotlib=False)
-        force_html = force_obj.html()
-
-    # ——— Stable-width centered container (fix tiny/squeezed chart)
-    html_all = f"""
-    <head>
-      {shap.getjs()}
-      <meta name="viewport" content="width=device-width, initial-scale=1" />
-      <style>
-        html, body {{ margin:0; padding:0; }}
-        .outer {{
-          width: 100%;
-          display: flex;
-          justify-content: center;            /* center horizontally */
-        }}
-        .inner {{
-          width: min(1200px, max(720px, 60vw)); /* ★ stable width for SHAP JS */
-          overflow-x: auto;                     /* allow scroll on very small screens */
-        }}
-        .inner > div:first-child {{ display: inline-block !important; }}
-      </style>
-    </head>
-    <body>
-      <div class="outer">
-        <div class="inner" id="shap-holder">
-          {force_html}
-        </div>
-      </div>
-      <script>
-        (function() {{
-          // ensure SHAP root doesn't force 100% width
-          var holder = document.getElementById('shap-holder');
-          if (!holder) return;
-          var child = holder.firstElementChild;
-          if (!child) return;
-          child.style.display = 'inline-block';
-          child.style.width   = 'auto';
-          child.style.maxWidth = '100%';
-        }})();
-      </script>
-    </body>
-    """
-
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".html") as tmp:
-        tmp.write(html_all.encode("utf-8"))
-        tmp_path = tmp.name
-
-    with open(tmp_path, "r", encoding="utf-8") as f:
-        components.html(f.read(), height=520, scrolling=True)
-
-    os.remove(tmp_path)
+    # ——— 静态 force_plot（不依赖任何 JS/CDN）
+    plt.figure(figsize=(10, 3.8))
+    shap.force_plot(
+        base_val,
+        sv_vec,
+        feature_values,
+        feature_names=short_names,
+        matplotlib=True,
+        show=False
+    )
+    st.pyplot(plt.gcf(), use_container_width=True)
+    plt.close()
